@@ -1,0 +1,336 @@
+#+TITLE: Evil-mode manual
+#+AUTHOR: Eivind Fonn, Frank Fischer, Vegard Øye
+#+EMAIL: evfonn@gmail.com
+#+DATE: 2011-2019
+
+#+LANGUAGE: en
+#+TEXINFO_DIR_CATEGORY: Emacs
+#+TEXINFO_DIR_TITLE: Evil: (evil).
+#+TEXINFO_DIR_DESC: Extensible vi layer for Emacs.
+#+TEXINFO_DEFFN: t
+#+SUBTITLE: for version 1.3.0-snapshot
+
+# Local Variables:
+# org-adapt-indent: nil
+# End:
+
+* Overview
+
+Evil is an extensible vi layer for Emacs.  It emulates the main
+features of Vim,[fn:1] turning Emacs into a modal editor.  Like Emacs
+in general, Evil is extensible in Emacs Lisp.
+
+** Installation via package.el
+
+Evil is available as a package from MELPA stable and MELPA unstable.
+To set up ~package.el~ to work with one of these repositories, you can
+follow the instructions on [[https://melpa.org/#/getting-started][melpa.org]].
+
+Once that is done, you can execute the following commands:
+
+#+BEGIN_SRC fundamental
+  M-x package-refresh-contents
+  M-x package-install RET evil RET
+#+END_SRC
+
+#+TEXINFO: @noindent
+then choose 'evil' when queried for a package name.  Finally, add the
+following lines to your Emacs init file:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'evil)
+  (evil-mode 1)
+#+END_SRC
+
+** Manual installation
+
+First, install ~undo-tree~, ~goto-chg~ and ~cl-lib~.  If you have an
+Emacs version newer than 24.2, you should already have ~cl-lib~.
+
+Evil lives in a Git repository.  To download Evil, do
+
+#+BEGIN_SRC shell
+  git clone --depth 1 https://github.com/emacs-evil/evil.git
+#+END_SRC
+
+#+TEXINFO: @noindent
+Then add the following lines to your Emacs init file:
+
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'load-path "path/to/evil")
+  (require 'evil)
+  (evil-mode 1)
+#+END_SRC
+
+#+TEXINFO: @noindent
+Ensure you replace ~path/to/evil~ with the actual path to where you
+cloned Evil.
+
+** Modes and states
+
+The next time Emacs is started, it will come up in /normal state/,
+denoted by ~<N>~ in the mode line.  This is where the main vi bindings
+are defined.  Note that you can always disable normal state with
+~C-z~, which switches to an “Emacs state” (denoted by ~<E>~) in which
+vi keys are completely disabled.  Press ~C-z~ again to switch back to
+normal state.
+
+Evil uses the term /state/ for what is called a “mode” in vi, since
+/mode/ already has its own meaning in Emacs.  Evil defines a number of
+states, such as normal state (~<N>~), insert state (~<I>~), visual
+state (~<V>~), replace state (~<R>~), operator-pending state (~<O>~),
+motion state (~<M>~) and Emacs state (~<E>~).  Each state has its own
+keymaps and customization variables.
+
+* Settings
+
+Evil’s behaviour can be adjusted by setting some variables.  The
+current values may be inspected by doing
+
+#+BEGIN_SRC fundamental
+  M-x customize-group RET evil RET
+#+END_SRC
+
+To change the value of a variable, you can use this interface, or add
+a ~setq~ form to your Emacs init file, preferably before Evil is
+loaded.[fn:2]
+
+#+BEGIN_SRC emacs-lisp
+  (setq evil-shift-width 8)
+  ;; Load Evil
+  (require 'evil)
+#+END_SRC
+
+#+TEXINFO: @noindent
+Note that if a variable is buffer-local, you should use ~setq-default~
+instead of ~setq~ to change its global value.
+
+- Variable: evil-want-fine-undo
+
+  If true, a change-based action like ~cw~ may be undone in several
+  steps.  Otherwise (default), it is undone in one single operation.
+
+  Note that for backward compatibility purposes, a value of ~fine~ is
+  interpreted as ~nil~.
+
+- Variable: evil-backspace-join-lines
+
+  If true (default), backspace in insert state may join lines
+  together.  Otherwise, this is prevented.
+
+- Variable: evil-kbd-macro-suppress-motion-error
+
+  This variable controls whether the motions ~h~ and ~l~ trigger
+  end-of-line or beginning-of-line errors in macros.  If equal to
+  ~record~, errors are only suppressed when recording macros, but not
+  when replaying them.  If equal to ~replay~, errors are only
+  suppressed when replaying macros, but not when recording them.  If
+  equal to ~t~, errors are always suppressed.  If equal to ~nil~
+  (default), errors are never suppressed.
+
+- Variable: evil-mode-line-format
+
+  Determines the position of the state identifier tag in the mode
+  line.  If equal to ~before~ or ~after~, the tag is placed at the
+  beginning or the end of the mode line, respectively.  If ~nil~,
+  there is no tag.  Otherwise it may be a cons cell where the /car/ is
+  either ~before~ or ~after~, and the /cdr/ is a symbol already
+  present in the mode line.  The state identifier tag is then placed
+  before or after that symbol, respectively.
+
+- Variable: evil-mouse-word
+
+  A /thing-at-point/ symbol to use for double clicking.  If set to
+  ~evil-word~ (default), then double clicking will enter visual state
+  with a word selected.  If set to ~evil-WORD~, then a WORD will be
+  selected.
+
+- Variable: evil-bigword
+
+  A set of characters to be interpreted as WORDs.  This is enclosed
+  with ~[~ and ~]~ and used as a regular expression.  By default it is
+  ~“^ \t\r\n”~, meaning whitespace characters are considered WORD
+  boundaries.  Buffer-local.
+
+- Variable: evil-esc-delay
+
+  The time, in seconds, to wait for another key after escape is
+  pressed.  If no further event arrives during this time, the event is
+  translated to ~escape~.  Otherwise, it is translated according to
+  ~input-decode-map~.  This does not apply in Emacs state, and may be
+  inhibited by setting ~evil-inhibit-esc~.
+
+- Variable: evil-intercept-esc
+
+  This variable determines whether Evil should intercept the escape
+  key.  In the terminal, escape and a meta key sequence both generate
+  the same event.  In order to distinguish these, Evil uses
+  ~input-decode-map~.  It is not necessary to do this in a graphical
+  Emacs session.  However, if you prefer to use ~C-[~ as escape (which
+  is identical to the terminal escape key code), this interception
+  must also take place in graphical Emacs sessions.  Set this variable
+  to ~always~ (default), ~t~ (only in the terminal) or ~nil~ (never
+  intercept).
+
+- Variable: evil-show-paren-range
+
+  The minimal distance between point and a parenthesis which causes
+  the parenthesis to be highlighted in ~show-paren-mode~.
+
+** Wants
+
+- Variable: evil-want-C-i-jump
+
+  If true (default), then ~C-i~ jumps forward in the jump list.
+  Otherwise, ~C-i~ inserts a tab character.
+
+- Variable: evil-want-C-u-scroll
+
+  If true, then ~C-u~ scrolls the buffer, as in vi.  Otherwise
+  (default), ~C-u~ applies a prefix argument. The binding of ~C-u~
+  mirrors Emacs behaviour by default due to the relative ubiquity of
+  prefix arguments.
+
+** Search settings
+
+- Variable: evil-regexp-search
+
+  If true (default), then ~/~ and ~?~ use regular expressions for
+  searching.  Otherwise, the search expression is interpreted as plain
+  text.
+
+- Variable: evil-search-wrap
+
+  If true (default), then ~/~ and ~?~ wrap the search around the
+  buffer.  Otherwise, they stop at the buffer boundaries.
+
+- Variable: evil-flash-delay
+
+  The number of seconds to flash search matches when pressing ~n~ and
+  ~N~.
+
+** Indentation settings
+
+- Variable: evil-auto-indent
+
+  If true (default), inserted line will be indented when using the
+  ~o~ and ~O~ operators.  Buffer-local.
+
+- Variable: evil-shift-width
+
+  The number of columns by which a line is shifted when using the ~<~
+  and ~>~ commands.  Buffer-local.
+
+- Variable: evil-shift-round
+
+  If true (default), lines shifted by ~<~ and ~>~ are rounded to the
+  nearest multiple of ~evil-shift-width~.  Otherwise they are always
+  /shifted/ by a multiple of ~evil-shift-width~.  Buffer-local.
+
+- Variable: evil-indent-convert-tabs
+
+  If true (default), the ~=~ indendation operator converts between
+  leading tabs and spaces, according to the value of
+  ~indent-tabs-mode~.  Otherwise, tabs and spaces are left alone.
+
+** Cursor movement settings
+
+- Variable: evil-repeat-move-cursor
+
+  If true (default), repeating commands with ~.~ may move the
+  cursor.  Otherwise, the original position is preserved.
+
+- Variable: evil-move-cursor-back
+
+  If true (default), the cursor moves “backwards” when exiting insert
+  state, so that it ends up on the character to the left.  Otherwise
+  it remains in place, on the character to the right.
+
+- Variable: evil-move-beyond-eol
+
+  If true, the cursor is allowed to move one past the last character
+  of a line, as in Emacs.  Otherwise (default), it cannot move past
+  the last character.
+
+- Variable: evil-cross-lines
+
+  If true, certain motions that conventionally operate in a single
+  line may move to other lines.  Otherwise (default), they are
+  restricted to the current line.  This applies to ~h~, ~l~, ~f~, ~F~,
+  ~t~, ~T~, and ~~~.
+
+- Variable: evil-respect-visual-line-mode
+
+  If true, ~visual-line-mode~ is generally respected when it is on.
+  In this case, motions such as ~j~ and ~k~ navigate by visual lines
+  (on the screen) rather than “physical” lines (defined by newline
+  characters).  Otherwise (default), ~visual-line-mode~ is ignored.
+
+- Variable: evil-repeat-find-to-skip-next
+
+  If true (default), repeating a ~t~ or ~T~ motion using ~;~ or ~,~
+  skips adjacent matches.  Otherwise, you may find that repeated
+  motions do not move the cursor.
+
+- Variable: evil-track-eol
+
+  If true (default), vertical motions after ~$~ maintain the cursor at
+  the end of the line.  This is analogous to ~track-eol~, but respects
+  our interpretation of end-of-line.
+
+** Cursor display settings
+
+- Variable: evil-default-cursor
+
+  Specifies the default cursor to use.  This may be either a cursor
+  type as per the requirements outlined by ~C-h v cursor-type~, a
+  color string, a function that sets the cursor, or a list of such.
+
+** Window management settings
+
+- Variable: evil-auto-balance-windows
+
+  When true (default), window creation and deletion trigger a
+  rebalancing.
+
+- Variable: evil-split-window-below
+
+  If true, split windows are created below, as opposed to above
+  (default).
+
+- Variable: evil-split-window-right
+
+  If true, vertically split windows are created to the right, as
+  opposed to the left (default).
+
+* Copying
+:PROPERTIES:
+:COPYING:  t
+:END:
+
+This manual is for Evil (version 1.3.0-snapshot), an extensible vi
+layer for Emacs.
+
+Copyright (C) 2011-2019 Eivind Fonn, Frank Fischer and Vegard Øye.
+
+#+BEGIN_QUOTE
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts. A
+copy of the license is included in the section entitled “GNU Free
+Documentation License.”
+#+END_QUOTE
+
+The Evil team thanks everyone at gmane.emacs.vim-emulation for their
+feedback and contributions.
+
+* Footnotes
+
+[fn:2] Strictly speaking, the order only matters if the variable
+affects the way Evil is loaded.  This is the case with some variables.
+
+[fn:1] Vim is the most popular version of /vi/, a modal text editor
+with many implementations. Vim also adds some functions of its own,
+like visual selection and text objects.  For more information, see:
+[[https://vim.org][Vim official website]].
