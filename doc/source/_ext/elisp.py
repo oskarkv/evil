@@ -137,26 +137,19 @@ def emacs_arglist(var):
 class AbstractVariable(ObjectDescription):
 
     def handle_signature(self, sig, signode):
-        signode += addnodes.desc_annotation(sig, sig + ' ')
+        signode += addnodes.desc_annotation(sig, sig)
+        return sig
+
+    def run(self):
         extra = []
 
         default = self.default_value()
         if default:
-            extra.append(addnodes.desc_parameter(
-                '', 'default ',
-                addnodes.desc_annotation('', default)
-            ))
-
+            extra.append(f'Default: ``{default}``')
         if self.is_buffer_local():
-            extra.append(addnodes.desc_parameter('c', 'buffer-local'))
+            extra.append('buffer-local')
 
-        if extra:
-            parlist = addnodes.desc_parameterlist('?', '', *extra)
-            signode += parlist
-
-        return sig
-
-    def run(self):
+        self.content.data.extend(['', ', '.join(extra)])
         retval = super().run()
         return retval
 
